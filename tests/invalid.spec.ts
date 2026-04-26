@@ -35,28 +35,24 @@ describe('invalid', () => {
   describe('should throw an error when schema is not an object', () => {
     it('should throw an error when schema is an array', () => {
       expect(() => {
-        // @ts-expect-error testing invalid input
         validate([], '');
       }).toThrow('The schema needs to be an object');
     });
 
     it('should throw an error when schema is a string', () => {
       expect(() => {
-        // @ts-expect-error testing invalid input
         validate('', '');
       }).toThrow('The schema needs to be an object');
     });
 
     it('should throw an error when schema is a number', () => {
       expect(() => {
-        // @ts-expect-error testing invalid input
         validate(1, '');
       }).toThrow('The schema needs to be an object');
     });
 
     it('should throw an error when schema is a boolean', () => {
       expect(() => {
-        // @ts-expect-error testing invalid input
         validate(true, '');
       }).toThrow('The schema needs to be an object');
     });

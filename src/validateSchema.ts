@@ -1,4 +1,4 @@
-import schemaDefinition, { SchemaDefinition } from './Schema';
+import schemaDefinition, { SchemaDefinition } from './schema/Schema';
 
 /**
  * Parses and validates inputs for markdown validation.

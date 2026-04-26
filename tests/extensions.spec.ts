@@ -41,7 +41,7 @@ describe('frontmatter extension', () => {
       [frontmatterExtension]
     );
 
-    expect(result).toBe(true);
+    expect(result).toHaveLength(0);
   });
 });
 
@@ -68,11 +68,13 @@ describe('validateTokens extension delegation', () => {
       },
     };
 
-    expect(() => validateTokens(
+    const errors = validateTokens(
       toSchema([{ type: 'frontmatter' }]),
       toTokensList([{ type: 'frontmatter', raw: '---\n---\n', text: '' }]),
       [noOpExtension]
-    )).toThrow("No extension validator handled 'frontmatter' token");
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("No extension validator handled 'frontmatter' token");
   });
 
   it('skips an extension that has no validateToken when collecting validators', () => {
@@ -82,11 +84,13 @@ describe('validateTokens extension delegation', () => {
     };
 
     // Falls through to default case; extensionWithoutValidator is skipped, throws.
-    expect(() => validateTokens(
+    const errors = validateTokens(
       toSchema([{ type: 'frontmatter' }]),
       toTokensList([{ type: 'frontmatter', raw: '---\n---\n', text: '' }]),
       [extensionWithoutValidator]
-    )).toThrow("No extension validator handled 'frontmatter' token");
+    );
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("No extension validator handled 'frontmatter' token");
   });
 
   it('frontmatter validateToken returns undefined for non-frontmatter types', () => {
@@ -104,12 +108,14 @@ describe('validateTokens extension delegation', () => {
     // frontmatterExtension.validateToken sees type !== 'frontmatter' → returns undefined (line 55).
     // customExtension.validateToken then handles it and returns true.
 
-    // definition.type ('frontmatter') !== token.type ('custom-token') → throws before extensions run.
-    expect(() => validateTokens(
+    // definition.type ('frontmatter') !== token.type ('custom-token') → returns error before extensions run.
+    const errors1 = validateTokens(
       toSchema([{ type: 'frontmatter' as any }]),
       toTokensList([{ type: 'custom-token' as any }] as any),
       [frontmatterExtension, customExtension]
-    )).toThrow("Expected a 'frontmatter' token but got 'custom-token'");
+    );
+    expect(errors1).toHaveLength(1);
+    expect(errors1[0].message).toContain("Expected a 'frontmatter' token but got 'custom-token'");
 
     // We must use matching types to reach extension validators.
     const resultMatchingTypes = validateTokens(
@@ -118,6 +124,6 @@ describe('validateTokens extension delegation', () => {
       [frontmatterExtension, customExtension]
     );
 
-    expect(resultMatchingTypes).toBe(true);
+    expect(resultMatchingTypes).toHaveLength(0);
   });
 });

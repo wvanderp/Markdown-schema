@@ -19,7 +19,9 @@ title: hallo world
       ],
     };
 
-    expect(() => validate(schema, markdown)).toThrow('Expected 1 token(s) but got 2');
+    const errors = validate(schema, markdown);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('Expected 1 token(s) but got 2');
   });
 
   it('markdown should throw when a frontmatter is expected but not present', () => {
@@ -37,7 +39,9 @@ title: hallo world
         },
       ],
     };
-    expect(() => validate(schema, markdown)).toThrow('Expected 2 token(s) but got 1');
+    const errors = validate(schema, markdown);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('Expected 2 token(s) but got 1');
   });
 
   describe('markdown should be valid if it has a frontmatter and the schema expects it', () => {
@@ -60,7 +64,7 @@ title: hallo world
           },
         ],
       };
-      expect(validate(schema, markdown)).toBe(true);
+      expect(validate(schema, markdown)).toHaveLength(0);
     });
   });
 });

@@ -6,6 +6,11 @@ import type {
 } from './schema/Schema';
 import type { Extension } from './extensions/types';
 
+export interface ValidationError {
+  line: number;
+  message: string;
+}
+
 type RuntimeToken = MarkedToken | Record<string, unknown>;
 type ExtensionValidator = NonNullable<Extension['validateToken']>;
 
@@ -63,43 +68,48 @@ function equalsArrayIfDefined<T>(expected: T[] | undefined, actual: T[]): boolea
 }
 
 /**
- * Throws an error describing a scalar field mismatch on a token.
+ * Creates a ValidationError describing a scalar field mismatch on a token.
  * @param tokenType - The token type label used in the message.
  * @param field - Name of the mismatched field.
  * @param expected - Value required by the schema.
  * @param actual - Value found in the runtime token.
  * @param line - Source line where the token appears.
+ * @returns A ValidationError with a descriptive message.
  */
-function throwFieldMismatch(
+function createFieldMismatch(
   tokenType: string,
   field: string,
   expected: unknown,
   actual: unknown,
   line: number
-): never {
-  throw new Error(
-    `'${tokenType}' token has ${field} ${JSON.stringify(actual)} but expected ${JSON.stringify(expected)} ${formatPosition(line)}`
-  );
+): ValidationError {
+  return {
+    line,
+    message: `'${tokenType}' token has ${field} ${JSON.stringify(actual)} but expected ${JSON.stringify(expected)} ${formatPosition(line)}`,
+  };
 }
 
 /**
- * Checks a single scalar field and throws when the schema expectation is not met.
+ * Checks a single scalar field and returns a ValidationError array when the schema expectation is not met.
  * @param tokenType - Token type label for the error message.
  * @param field - Field name to check.
  * @param expected - Optional expected value from the schema.
  * @param actual - Runtime value from the token.
  * @param line - Current source line.
+ * @returns Array containing one error when there is a mismatch, or an empty array when the field matches.
  */
-function assertField(
+function checkField(
   tokenType: string,
   field: string,
   expected: unknown,
   actual: unknown,
   line: number
-): void {
+): ValidationError[] {
   if (expected !== undefined && !Object.is(expected, actual)) {
-    throwFieldMismatch(tokenType, field, expected, actual, line);
+    return [createFieldMismatch(tokenType, field, expected, actual, line)];
   }
+
+  return [];
 }
 
 /**
@@ -108,19 +118,19 @@ function assertField(
  * @param tokens - Optional nested runtime tokens.
  * @param extensionValidators - Validators contributed by active extensions.
  * @param line - Source line of the parent token.
- * @throws {Error} When nested tokens do not satisfy nested definitions.
+ * @returns Array of validation errors found in nested tokens.
  */
 function validateNestedTokens(
   definitions: SchemaTokenDefinition[] | undefined,
   tokens: Token[] | undefined,
   extensionValidators: ExtensionValidator[],
   line: number
-): void {
+): ValidationError[] {
   if (!definitions) {
-    return;
+    return [];
   }
 
-  validateTokenList(definitions, tokens ?? [], extensionValidators, line);
+  return validateTokenList(definitions, tokens ?? [], extensionValidators, line);
 }
 
 /**
@@ -155,28 +165,34 @@ function normalizeTokensForDefinitions(
  * @param token - Runtime table cell token.
  * @param extensionValidators - Validators contributed by active extensions.
  * @param line - Source line of the containing table token.
- * @throws {Error} When scalar fields or nested tokens do not match.
+ * @returns Array of validation errors found in the cell.
  */
 function validateTableCell(
   definition: SchemaTableCellDefinition,
   token: Tokens.TableCell,
   extensionValidators: ExtensionValidator[],
   line: number
-): void {
-  if (definition.text !== undefined) {
-    if (!Object.is(definition.text, token.text)) {
-      throw new Error(
-        `Table cell text ${JSON.stringify(token.text)} does not match expected ${JSON.stringify(definition.text)} ${formatPosition(line)}`
-      );
-    }
+): ValidationError[] {
+  const errors: ValidationError[] = [];
+
+  if (definition.text !== undefined && !Object.is(definition.text, token.text)) {
+    errors.push({
+      line,
+      message: `Table cell text ${JSON.stringify(token.text)} does not match expected ${JSON.stringify(definition.text)} ${formatPosition(line)}`,
+    });
   }
 
-  assertField('table_cell', 'header', definition.header, token.header, line);
-  assertField('table_cell', 'align', definition.align, token.align, line);
+  const headerError = checkField('table_cell', 'header', definition.header, token.header, line);
+  errors.push(...headerError);
+
+  const alignError = checkField('table_cell', 'align', definition.align, token.align, line);
+  errors.push(...alignError);
 
   if (definition.tokens) {
-    validateTokenList(definition.tokens, token.tokens, extensionValidators, line);
+    errors.push(...validateTokenList(definition.tokens, token.tokens, extensionValidators, line));
   }
+
+  return errors;
 }
 
 /**
@@ -185,23 +201,28 @@ function validateTableCell(
  * @param tokens - Runtime table cells for a row.
  * @param extensionValidators - Validators contributed by active extensions.
  * @param line - Source line of the containing table token.
- * @throws {Error} When cell counts or individual cells do not match.
+ * @returns Array of validation errors found in the cells.
  */
 function validateTableCellList(
   definitions: SchemaTableCellDefinition[] | undefined,
   tokens: Tokens.TableCell[],
   extensionValidators: ExtensionValidator[],
   line: number
-): void {
+): ValidationError[] {
   if (!definitions) {
-    return;
+    return [];
   }
 
   if (definitions.length !== tokens.length) {
-    throw new Error(`Expected ${definitions.length} table cell(s) but got ${tokens.length} ${formatPosition(line)}`);
+    return [{
+      line,
+      message: `Expected ${definitions.length} table cell(s) but got ${tokens.length} ${formatPosition(line)}`,
+    }];
   }
 
-  definitions.forEach((definition, index) => validateTableCell(definition, tokens[index], extensionValidators, line));
+  return definitions.flatMap((definition, index) =>
+    validateTableCell(definition, tokens[index], extensionValidators, line)
+  );
 }
 
 /**
@@ -210,23 +231,28 @@ function validateTableCellList(
  * @param rows - Runtime table rows.
  * @param extensionValidators - Validators contributed by active extensions.
  * @param line - Source line of the containing table token.
- * @throws {Error} When row counts or per-row cells do not match.
+ * @returns Array of validation errors found in the rows.
  */
 function validateTableRowList(
   definitions: SchemaTableCellDefinition[][] | undefined,
   rows: Tokens.TableCell[][],
   extensionValidators: ExtensionValidator[],
   line: number
-): void {
+): ValidationError[] {
   if (!definitions) {
-    return;
+    return [];
   }
 
   if (definitions.length !== rows.length) {
-    throw new Error(`Expected ${definitions.length} table row(s) but got ${rows.length} ${formatPosition(line)}`);
+    return [{
+      line,
+      message: `Expected ${definitions.length} table row(s) but got ${rows.length} ${formatPosition(line)}`,
+    }];
   }
 
-  definitions.forEach((definitionRow, index) => validateTableCellList(definitionRow, rows[index], extensionValidators, line));
+  return definitions.flatMap((definitionRow, index) =>
+    validateTableCellList(definitionRow, rows[index], extensionValidators, line)
+  );
 }
 
 /**
@@ -235,27 +261,30 @@ function validateTableRowList(
  * @param token - Runtime markdown token.
  * @param extensionValidators - Validators contributed by active extensions.
  * @param line - 1-based source line where this token appears.
- * @throws {Error} When the token type or any constrained field does not match.
+ * @returns Array of validation errors found in the token.
  */
 function validateToken(
   definition: SchemaTokenDefinition,
   token: RuntimeToken,
   extensionValidators: ExtensionValidator[],
   line: number
-): void {
+): ValidationError[] {
   const actualType = (token as { type: string }).type;
 
   if (definition.type !== actualType) {
-    throw new Error(
-      `Expected a '${definition.type}' token but got '${actualType}' ${formatPosition(line)}`
-    );
+    return [{
+      line,
+      message: `Expected a '${definition.type}' token but got '${actualType}' ${formatPosition(line)}`,
+    }];
   }
+
+  const errors: ValidationError[] = [];
 
   switch (definition.type) {
     case 'blockquote': {
       const markedToken = token as Tokens.Blockquote;
-      assertField('blockquote', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('blockquote', 'text', definition.text, markedToken.text, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
@@ -265,7 +294,7 @@ function validateToken(
 
     case 'checkbox': {
       const markedToken = token as Tokens.Checkbox;
-      assertField('checkbox', 'checked', definition.checked, markedToken.checked, line);
+      errors.push(...checkField('checkbox', 'checked', definition.checked, markedToken.checked, line));
       break;
     }
 
@@ -275,7 +304,7 @@ function validateToken(
       const tokRec = asRecord(markedToken);
 
       for (const field of ['codeBlockStyle', 'lang', 'text', 'escaped'] as const) {
-        assertField('code', field, defRec[field], tokRec[field], line);
+        errors.push(...checkField('code', field, defRec[field], tokRec[field], line));
       }
 
       break;
@@ -283,35 +312,39 @@ function validateToken(
 
     case 'codespan': {
       const markedToken = token as Tokens.Codespan;
-      assertField('codespan', 'text', definition.text, markedToken.text, line);
+      errors.push(...checkField('codespan', 'text', definition.text, markedToken.text, line));
       break;
     }
 
     case 'def': {
       const markedToken = token as Tokens.Def;
-      assertField('def', 'tag', definition.tag, markedToken.tag, line);
-      assertField('def', 'href', definition.href, markedToken.href, line);
-      assertField('def', 'title', definition.title, markedToken.title, line);
+      for (const [field, expected, actual] of [
+        ['tag', definition.tag, markedToken.tag],
+        ['href', definition.href, markedToken.href],
+        ['title', definition.title, markedToken.title],
+      ] as const) {
+        errors.push(...checkField('def', field, expected, actual, line));
+      }
       break;
     }
 
     case 'del': {
       const markedToken = token as Tokens.Del;
-      assertField('del', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('del', 'text', definition.text, markedToken.text, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
     case 'em': {
       const markedToken = token as Tokens.Em;
-      assertField('em', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('em', 'text', definition.text, markedToken.text, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
     case 'escape': {
       const markedToken = token as Tokens.Escape;
-      assertField('escape', 'text', definition.text, markedToken.text, line);
+      errors.push(...checkField('escape', 'text', definition.text, markedToken.text, line));
       break;
     }
 
@@ -319,13 +352,14 @@ function validateToken(
       const markedToken = token as Tokens.Heading;
 
       if (definition.depth !== undefined && !Object.is(definition.depth, markedToken.depth)) {
-        throw new Error(
-          `Heading has depth ${markedToken.depth} but expected ${definition.depth} ${formatPosition(line)}`
-        );
+        errors.push({
+          line,
+          message: `Heading has depth ${markedToken.depth} but expected ${definition.depth} ${formatPosition(line)}`,
+        });
       }
 
-      assertField('heading', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('heading', 'text', definition.text, markedToken.text, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
@@ -339,7 +373,7 @@ function validateToken(
       const tokRec = asRecord(markedToken);
 
       for (const field of ['pre', 'text', 'block', 'inLink', 'inRawBlock'] as const) {
-        assertField('html', field, defRec[field], tokRec[field], line);
+        errors.push(...checkField('html', field, defRec[field], tokRec[field], line));
       }
 
       break;
@@ -347,46 +381,62 @@ function validateToken(
 
     case 'image': {
       const markedToken = token as Tokens.Image;
-      assertField('image', 'href', definition.href, markedToken.href, line);
-      assertField('image', 'title', definition.title, markedToken.title, line);
-      assertField('image', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      for (const [field, expected, actual] of [
+        ['href', definition.href, markedToken.href],
+        ['title', definition.title, markedToken.title],
+        ['text', definition.text, markedToken.text],
+      ] as const) {
+        errors.push(...checkField('image', field, expected, actual, line));
+      }
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
     case 'link': {
       const markedToken = token as Tokens.Link;
-      assertField('link', 'href', definition.href, markedToken.href, line);
-      assertField('link', 'title', definition.title, markedToken.title, line);
-      assertField('link', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      for (const [field, expected, actual] of [
+        ['href', definition.href, markedToken.href],
+        ['title', definition.title, markedToken.title],
+        ['text', definition.text, markedToken.text],
+      ] as const) {
+        errors.push(...checkField('link', field, expected, actual, line));
+      }
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
     case 'list': {
       const markedToken = token as Tokens.List;
-      assertField('list', 'ordered', definition.ordered, markedToken.ordered, line);
-      assertField('list', 'start', definition.start, markedToken.start, line);
-      assertField('list', 'loose', definition.loose, markedToken.loose, line);
-      validateNestedTokens(definition.items, markedToken.items, extensionValidators, line);
+      for (const [field, expected, actual] of [
+        ['ordered', definition.ordered, markedToken.ordered],
+        ['start', definition.start, markedToken.start],
+        ['loose', definition.loose, markedToken.loose],
+      ] as const) {
+        errors.push(...checkField('list', field, expected, actual, line));
+      }
+      errors.push(...validateNestedTokens(definition.items, markedToken.items, extensionValidators, line));
       break;
     }
 
     case 'list_item': {
       const markedToken = token as Tokens.ListItem;
-      assertField('list_item', 'task', definition.task, markedToken.task, line);
-      assertField('list_item', 'checked', definition.checked, markedToken.checked, line);
-      assertField('list_item', 'loose', definition.loose, markedToken.loose, line);
-      assertField('list_item', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      for (const [field, expected, actual] of [
+        ['task', definition.task, markedToken.task],
+        ['checked', definition.checked, markedToken.checked],
+        ['loose', definition.loose, markedToken.loose],
+        ['text', definition.text, markedToken.text],
+      ] as const) {
+        errors.push(...checkField('list_item', field, expected, actual, line));
+      }
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
     case 'paragraph': {
       const markedToken = token as Tokens.Paragraph;
-      assertField('paragraph', 'pre', (definition as { pre?: unknown }).pre, (markedToken as unknown as { pre?: unknown }).pre, line);
-      assertField('paragraph', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('paragraph', 'pre', (definition as { pre?: unknown }).pre, (markedToken as unknown as { pre?: unknown }).pre, line));
+      errors.push(...checkField('paragraph', 'text', definition.text, markedToken.text, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
@@ -396,8 +446,8 @@ function validateToken(
 
     case 'strong': {
       const markedToken = token as Tokens.Strong;
-      assertField('strong', 'text', definition.text, markedToken.text, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('strong', 'text', definition.text, markedToken.text, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
@@ -405,21 +455,22 @@ function validateToken(
       const markedToken = token as Tokens.Table;
 
       if (!equalsArrayIfDefined(definition.align, markedToken.align)) {
-        throw new Error(
-          `Table align ${JSON.stringify(markedToken.align)} does not match expected ${JSON.stringify(definition.align)} ${formatPosition(line)}`
-        );
+        errors.push({
+          line,
+          message: `Table align ${JSON.stringify(markedToken.align)} does not match expected ${JSON.stringify(definition.align)} ${formatPosition(line)}`,
+        });
       }
 
-      validateTableCellList(definition.header, markedToken.header, extensionValidators, line);
-      validateTableRowList(definition.rows, markedToken.rows, extensionValidators, line);
+      errors.push(...validateTableCellList(definition.header, markedToken.header, extensionValidators, line));
+      errors.push(...validateTableRowList(definition.rows, markedToken.rows, extensionValidators, line));
       break;
     }
 
     case 'text': {
       const markedToken = token as Tokens.Text;
-      assertField('text', 'text', definition.text, markedToken.text, line);
-      assertField('text', 'escaped', definition.escaped, markedToken.escaped, line);
-      validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line);
+      errors.push(...checkField('text', 'text', definition.text, markedToken.text, line));
+      errors.push(...checkField('text', 'escaped', definition.escaped, markedToken.escaped, line));
+      errors.push(...validateNestedTokens(definition.tokens, markedToken.tokens, extensionValidators, line));
       break;
     }
 
@@ -436,20 +487,24 @@ function validateToken(
 
         if (result !== undefined) {
           if (!result) {
-            throw new Error(
-              `Extension validator rejected '${definition.type}' token ${formatPosition(line)}`
-            );
+            return [{
+              line,
+              message: `Extension validator rejected '${definition.type}' token ${formatPosition(line)}`,
+            }];
           }
 
-          return;
+          return [];
         }
       }
 
-      throw new Error(
-        `No extension validator handled '${definition.type}' token ${formatPosition(line)}`
-      );
+      return [{
+        line,
+        message: `No extension validator handled '${definition.type}' token ${formatPosition(line)}`,
+      }];
     }
   }
+
+  return errors;
 }
 
 /**
@@ -458,27 +513,30 @@ function validateToken(
  * @param tokens - Runtime tokens from marked.
  * @param extensionValidators - Validators contributed by active extensions.
  * @param startLine - 1-based line number of the first token in this list.
- * @throws {Error} When list lengths or any token comparison fails.
+ * @returns Array of validation errors found in the list.
  */
 function validateTokenList(
   definitions: SchemaTokenDefinition[],
   tokens: TokensWithOptionalSpace,
   extensionValidators: ExtensionValidator[],
   startLine: number = 1
-): void {
+): ValidationError[] {
   const normalizedTokens = normalizeTokensForDefinitions(definitions, tokens);
 
   if (definitions.length !== normalizedTokens.length) {
-    throw new Error(`Expected ${definitions.length} token(s) but got ${normalizedTokens.length}`);
+    return [{ line: startLine, message: `Expected ${definitions.length} token(s) but got ${normalizedTokens.length}` }];
   }
 
+  const errors: ValidationError[] = [];
   let currentLine = startLine;
 
   for (let i = 0; i < definitions.length; i++) {
     const token = normalizedTokens[i] as RuntimeToken;
-    validateToken(definitions[i], token, extensionValidators, currentLine);
+    errors.push(...validateToken(definitions[i], token, extensionValidators, currentLine));
     currentLine += countLines((token as { raw?: string }).raw ?? '');
   }
+
+  return errors;
 }
 
 /**
@@ -486,11 +544,9 @@ function validateTokenList(
  * @param schema - The schema defining expected token types.
  * @param markdownTokens - The parsed markdown tokens to validate.
  * @param extensions - Active extensions that may handle custom token types.
- * @returns `true` if the tokens exactly match the schema.
- * @throws {Error} When the tokens do not match the schema, with a descriptive message.
+ * @returns Array of validation errors. An empty array means the tokens exactly match the schema.
  */
-export default function validateTokens(schema: SchemaDefinition, markdownTokens: TokensList, extensions: Extension[] = []): boolean {
+export default function validateTokens(schema: SchemaDefinition, markdownTokens: TokensList, extensions: Extension[] = []): ValidationError[] {
   const extensionValidators = extensions.flatMap(ext => ext.validateToken ? [ext.validateToken.bind(ext)] : []);
-  validateTokenList(schema.children, [...markdownTokens], extensionValidators);
-  return true;
+  return validateTokenList(schema.children, [...markdownTokens], extensionValidators);
 }

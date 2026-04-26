@@ -31,7 +31,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates table cells with nested text tokens', () => {
@@ -57,7 +57,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('supports full frontmatter and mixed token validation with vague constraints', () => {
@@ -80,7 +80,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates blockquote token with nested paragraph', () => {
@@ -93,7 +93,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates fenced code block token', () => {
@@ -106,7 +106,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates indented code block token', () => {
@@ -119,7 +119,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates codespan token inside paragraph', () => {
@@ -138,7 +138,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates def token', () => {
@@ -151,7 +151,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates del token inside paragraph', () => {
@@ -169,7 +169,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates em token inside paragraph', () => {
@@ -187,7 +187,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates escape token inside paragraph', () => {
@@ -205,7 +205,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates hr token', () => {
@@ -218,7 +218,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates html block token', () => {
@@ -231,7 +231,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates image token inside paragraph', () => {
@@ -249,7 +249,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates link token inside paragraph', () => {
@@ -267,7 +267,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates space token between block elements', () => {
@@ -282,7 +282,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates strong token inside paragraph', () => {
@@ -300,7 +300,7 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 
   it('validates text token inside paragraph', () => {
@@ -319,6 +319,6 @@ describe('marked ast integration', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(true);
+    expect(validate(schema, markdown)).toHaveLength(0);
   });
 });

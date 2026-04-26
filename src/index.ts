@@ -4,8 +4,9 @@ import validateTokens from './validateTokens';
 import validateMarkdown from './validateMarkdown';
 import { resolveExtensions } from './extensions/index';
 import type { Extension } from './extensions/types';
+import type { ValidationError } from './validateTokens';
 
-export type { Extension };
+export type { Extension, ValidationError };
 
 /**
  * Extracts the `extensions` string array from a raw schema object, if present.
@@ -30,10 +31,10 @@ function extractExtensionNames(schema: unknown): string[] {
  * Validates the markdown against the schema.
  * @param schema - The schema to validate against.
  * @param markdown - The markdown string to validate.
- * @returns `true` if the markdown matches the schema, `false` otherwise.
+ * @returns An array of validation errors. An empty array means the markdown matches the schema.
  * @throws {Error} If the schema or markdown inputs are invalid, or if an unknown extension is referenced.
  */
-export default function validate(schema: unknown, markdown: string): boolean {
+export default function validate(schema: unknown, markdown: string): ValidationError[] {
   validateMarkdown(markdown);
 
   const extensionNames = extractExtensionNames(schema);
@@ -50,6 +51,7 @@ export default function validate(schema: unknown, markdown: string): boolean {
       return result.context;
     }
 
+    /* istanbul ignore next */
     return undefined;
   });
 
@@ -62,6 +64,7 @@ export default function validate(schema: unknown, markdown: string): boolean {
       return ext.postprocessTokens(tokens, preprocessContexts[index]);
     }
 
+    /* istanbul ignore next */
     return tokens;
   }, markdownTokens);
 

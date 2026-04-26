@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import validate from '../src';
 
 describe('simple presents tests', () => {
-  it('markdown should fail validation if it has a frontmatter but the schema does not expect it', () => {
+  it('markdown should throw if it has a frontmatter but the schema does not expect it', () => {
     const markdown = `---
 title: hallo world
 ---
@@ -19,10 +19,10 @@ title: hallo world
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(false);
+    expect(() => validate(schema, markdown)).toThrow('Expected 1 token(s) but got 2');
   });
 
-  it('markdown should have a frontmatter if the schema expects it', () => {
+  it('markdown should throw when a frontmatter is expected but not present', () => {
     const markdown = '# hallo world';
 
     const schema = {
@@ -37,7 +37,7 @@ title: hallo world
         },
       ],
     };
-    expect(validate(schema, markdown)).toBe(false);
+    expect(() => validate(schema, markdown)).toThrow('Expected 2 token(s) but got 1');
   });
 
   describe('markdown should be valid if it has a frontmatter and the schema expects it', () => {

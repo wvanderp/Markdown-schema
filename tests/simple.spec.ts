@@ -17,7 +17,7 @@ describe('simple cases', () => {
     expect(validate(schema, markdown)).toBe(true);
   });
 
-  it('should return false if the schema does not match', () => {
+  it('should throw when the schema does not match', () => {
     const markdown = '# hallo world';
 
     const schema = {
@@ -29,7 +29,7 @@ describe('simple cases', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(false);
+    expect(() => validate(schema, markdown)).toThrow("Expected a 'paragraph' token but got 'heading'");
   });
 
   it('should handle multiple definitions', () => {
@@ -50,7 +50,7 @@ describe('simple cases', () => {
     expect(validate(schema, markdown)).toBe(true);
   });
 
-  it('should return false if the schema does not match', () => {
+  it('should throw when the schema does not match', () => {
     const markdown = '# hallo world\n\n hallo world';
 
     const schema = {
@@ -65,7 +65,7 @@ describe('simple cases', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(false);
+    expect(() => validate(schema, markdown)).toThrow("Expected a 'heading' token but got 'paragraph'");
   });
 
   it('should return true if the schema matches with multiple children', () => {
@@ -86,7 +86,7 @@ describe('simple cases', () => {
     expect(validate(schema, markdown)).toBe(true);
   });
 
-  it('should return false when there are more definitions than tokens', () => {
+  it('should throw when there are more definitions than tokens', () => {
     const markdown = '# hallo world';
 
     const schema = {
@@ -101,10 +101,10 @@ describe('simple cases', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(false);
+    expect(() => validate(schema, markdown)).toThrow('Expected 2 token(s) but got 1');
   });
 
-  it('should return false when there are more tokens than definitions', () => {
+  it('should throw when there are more tokens than definitions', () => {
     const markdown = '# hallo world\n\n hallo world';
 
     const schema = {
@@ -116,6 +116,6 @@ describe('simple cases', () => {
       ],
     };
 
-    expect(validate(schema, markdown)).toBe(false);
+    expect(() => validate(schema, markdown)).toThrow('Expected 1 token(s) but got 2');
   });
 });

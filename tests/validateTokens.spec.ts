@@ -139,33 +139,27 @@ describe('validateTokens', () => {
   });
 
   it('fails when top-level type does not match', () => {
-    const result = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'paragraph' }]),
       toTokensList([{ type: 'heading', raw: '# t', depth: 1, text: 't', tokens: [] }])
-    );
-
-    expect(result).toBe(false);
+    )).toThrow("Expected a 'paragraph' token but got 'heading' at line 1, column 1");
   });
 
   it('fails on nested token mismatch', () => {
-    const result = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'paragraph', tokens: [{ type: 'strong' }] }]),
       toTokensList([{ type: 'paragraph', raw: 'x', text: 'x', tokens: [{ type: 'em', raw: '*x*', text: 'x', tokens: [] }] }])
-    );
-
-    expect(result).toBe(false);
+    )).toThrow("Expected a 'strong' token but got 'em' at line 1, column 1");
   });
 
   it('fails when expected space token is missing', () => {
-    const result = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'heading' }, { type: 'space' }, { type: 'paragraph' }]),
       toTokensList([
         { type: 'heading', raw: '# h', depth: 1, text: 'h', tokens: [] },
         { type: 'paragraph', raw: 'p', text: 'p', tokens: [] },
       ])
-    );
-
-    expect(result).toBe(false);
+    )).toThrow('Expected 3 token(s) but got 2');
   });
 
   it('fails table align and row constraints when schema specifies them', () => {
@@ -177,18 +171,15 @@ describe('validateTokens', () => {
       rows: [[{ text: 'v', tokens: [{ type: 'text', raw: 'v', text: 'v', escaped: false }], header: false, align: 'left' }]],
     };
 
-    const alignMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', align: ['right'] }]),
       toTokensList([tableToken])
-    );
+    )).toThrow(/Table align .* does not match expected/);
 
-    const rowMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', rows: [[{ text: 'x' }]] }]),
       toTokensList([tableToken])
-    );
-
-    expect(alignMismatch).toBe(false);
-    expect(rowMismatch).toBe(false);
+    )).toThrow(/Table cell text .* does not match expected/);
   });
 
   it('covers table header and row length branches', () => {
@@ -200,56 +191,67 @@ describe('validateTokens', () => {
       rows: [[{ text: 'v', tokens: [{ type: 'text', raw: 'v', text: 'v', escaped: false }], header: false, align: 'left' }]],
     };
 
-    const rowsOmittedInSchema = validateTokens(
+    expect(validateTokens(
       toSchema([{ type: 'table', header: [{ text: 'h', header: true, align: 'left' }] }]),
       toTokensList([baseTableToken])
-    );
+    )).toBe(true);
 
-    const headerLengthMismatch = validateTokens(
+    // Table cell with no text constraint in schema (covers definition.text === undefined branch)
+    expect(validateTokens(
+      toSchema([{ type: 'table', header: [{ header: true, align: 'left' }] }]),
+      toTokensList([baseTableToken])
+    )).toBe(true);
+
+    expect(() => validateTokens(
       toSchema([{ type: 'table', header: [{ text: 'h' }, { text: 'extra' }] }]),
       toTokensList([baseTableToken])
-    );
+    )).toThrow('Expected 2 table cell(s) but got 1');
 
-    const headerCellMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', header: [{ text: 'different' }] }]),
       toTokensList([baseTableToken])
-    );
+    )).toThrow(/Table cell text .* does not match expected/);
 
-    const rowCountMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', rows: [[{ text: 'v' }], [{ text: 'extra' }]] }]),
       toTokensList([baseTableToken])
-    );
+    )).toThrow('Expected 2 table row(s) but got 1');
 
-    const alignLengthMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', align: ['left', 'right'] }]),
       toTokensList([baseTableToken])
-    );
+    )).toThrow(/Table align .* does not match expected/);
 
-    const headerFlagMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', header: [{ text: 'h', header: false }] }]),
       toTokensList([baseTableToken])
-    );
+    )).toThrow("'table_cell' token has header true but expected false");
 
-    const headerAlignMismatch = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'table', header: [{ text: 'h', align: 'right' }] }]),
       toTokensList([baseTableToken])
-    );
-
-    expect(rowsOmittedInSchema).toBe(true);
-    expect(headerLengthMismatch).toBe(false);
-    expect(headerCellMismatch).toBe(false);
-    expect(rowCountMismatch).toBe(false);
-    expect(alignLengthMismatch).toBe(false);
-    expect(headerFlagMismatch).toBe(false);
-    expect(headerAlignMismatch).toBe(false);
+    )).toThrow("'table_cell' token has align \"left\" but expected \"right\"");
   });
 
   it('fails when text token expects nested tokens but runtime has none', () => {
-    const result = validateTokens(
+    expect(() => validateTokens(
       toSchema([{ type: 'text', tokens: [{ type: 'text' }] }]),
       toTokensList([{ type: 'text', raw: 'x', text: 'x', escaped: false }])
-    );
+    )).toThrow('Expected 1 token(s) but got 0');
+  });
 
-    expect(result).toBe(false);
+  it('throws a heading-specific message when depth does not match', () => {
+    expect(() => validateTokens(
+      toSchema([{ type: 'heading', depth: 2 }]),
+      toTokensList([{ type: 'heading', raw: '# t', depth: 1, text: 't', tokens: [] }])
+    )).toThrow('Heading has depth 1 but expected 2 at line 1, column 1');
+  });
+
+  it('throws when an extension validator explicitly rejects a token', () => {
+    expect(() => validateTokens(
+      toSchema([{ type: 'frontmatter', text: 'expected-text' }]),
+      toTokensList([{ type: 'frontmatter', raw: '---\nactual\n---\n', text: 'actual-text' }]),
+      [frontmatterExtension]
+    )).toThrow("Extension validator rejected 'frontmatter' token");
   });
 });

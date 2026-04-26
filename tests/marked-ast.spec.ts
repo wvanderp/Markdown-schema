@@ -65,6 +65,7 @@ describe('marked ast integration', () => {
 
     const schema = {
       type: 'root',
+      extensions: ['frontmatter'],
       children: [
         { type: 'frontmatter' },
         { type: 'heading', depth: 2, tokens: [{ type: 'text' }] },

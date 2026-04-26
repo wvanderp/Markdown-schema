@@ -2,6 +2,7 @@ import type { TokensList } from 'marked';
 import { describe, expect, it } from 'vitest';
 import type { SchemaDefinition, SchemaTokenDefinition } from '../src/schema/Schema';
 import validateTokens from '../src/validateTokens';
+import frontmatterExtension from '../src/extensions/frontmatter';
 
 /**
  * Converts plain token arrays into a `TokensList` with a links map.
@@ -120,13 +121,21 @@ describe('validateTokens', () => {
         definition: { type: 'text', text: 'x', escaped: false, tokens: [{ type: 'text', text: 'x' }] },
         token: { type: 'text', raw: 'x', text: 'x', escaped: false, tokens: [{ type: 'text', raw: 'x', text: 'x', escaped: false }] },
       },
-      { definition: { type: 'frontmatter', text: 'title: x' }, token: { type: 'frontmatter', raw: '---\ntitle: x\n---\n', text: 'title: x' } },
     ];
 
     for (const current of cases) {
       const result = validateTokens(toSchema([current.definition]), toTokensList([current.token]));
       expect(result).toBe(true);
     }
+  });
+
+  it('validates frontmatter tokens via the frontmatter extension', () => {
+    const result = validateTokens(
+      toSchema([{ type: 'frontmatter', text: 'title: x' }]),
+      toTokensList([{ type: 'frontmatter', raw: '---\ntitle: x\n---\n', text: 'title: x' }]),
+      [frontmatterExtension]
+    );
+    expect(result).toBe(true);
   });
 
   it('fails when top-level type does not match', () => {

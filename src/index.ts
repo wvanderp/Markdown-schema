@@ -1,56 +1,29 @@
 import { marked, type TokensList } from 'marked';
 import validateSchema from './validateSchema';
 import validateTokens from './validateTokens';
-import type { FrontmatterToken } from './schema/Schema';
 import validateMarkdown from './validateMarkdown';
+import { resolveExtensions } from './extensions/index';
+import type { Extension } from './extensions/types';
 
-type FrontmatterParseResult = {
-  frontmatterToken?: FrontmatterToken;
-  markdownWithoutFrontmatter: string;
-};
-
-/**
- * Parses an optional YAML frontmatter block from the start of markdown.
- * @param markdown - Markdown content that may start with a frontmatter section.
- * @returns Parsed frontmatter token and markdown content with frontmatter removed.
- */
-function parseFrontmatter(markdown: string): FrontmatterParseResult {
-  const frontmatterRegex = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/;
-  const match = frontmatterRegex.exec(markdown);
-
-  if (!match) {
-    return {
-      markdownWithoutFrontmatter: markdown,
-    };
-  }
-
-  return {
-    frontmatterToken: {
-      type: 'frontmatter',
-      raw: match[0],
-      text: match[1],
-    },
-    markdownWithoutFrontmatter: markdown.slice(match[0].length),
-  };
-}
+export type { Extension };
 
 /**
- * Prepends a frontmatter token to the lexer token list when present.
- * @param tokens - Markdown tokens produced by marked.
- * @param frontmatterToken - Optional parsed frontmatter token.
- * @returns Token list with frontmatter token inserted at the beginning when available.
+ * Extracts the `extensions` string array from a raw schema object, if present.
+ * @param schema - Unvalidated raw schema value.
+ * @returns Array of extension name strings, or an empty array.
  */
-function prependFrontmatterToken(tokens: TokensList, frontmatterToken?: FrontmatterToken): TokensList {
-  if (!frontmatterToken) {
-    return tokens;
+function extractExtensionNames(schema: unknown): string[] {
+  if (typeof schema !== 'object' || schema === null || Array.isArray(schema)) {
+    return [];
   }
 
-  return Object.assign([
-    frontmatterToken,
-    ...tokens,
-  ], {
-    links: tokens.links,
-  }) as TokensList;
+  const raw = schema as Record<string, unknown>;
+
+  if (!Array.isArray(raw['extensions'])) {
+    return [];
+  }
+
+  return raw['extensions'].filter((e): e is string => typeof e === 'string');
 }
 
 /**
@@ -58,15 +31,39 @@ function prependFrontmatterToken(tokens: TokensList, frontmatterToken?: Frontmat
  * @param schema - The schema to validate against.
  * @param markdown - The markdown string to validate.
  * @returns `true` if the markdown matches the schema, `false` otherwise.
- * @throws {Error} If the schema or markdown inputs are invalid.
+ * @throws {Error} If the schema or markdown inputs are invalid, or if an unknown extension is referenced.
  */
 export default function validate(schema: unknown, markdown: string): boolean {
   validateMarkdown(markdown);
-  const parsedInput = validateSchema(schema);
-  const { frontmatterToken, markdownWithoutFrontmatter } = parseFrontmatter(markdown);
 
-  const markdownTokens = marked.lexer(markdownWithoutFrontmatter);
-  const tokensWithFrontmatter = prependFrontmatterToken(markdownTokens, frontmatterToken);
+  const extensionNames = extractExtensionNames(schema);
+  const extensions = resolveExtensions(extensionNames);
+  const parsedSchema = validateSchema(schema, extensions);
 
-  return validateTokens(parsedInput, tokensWithFrontmatter);
+  // Pre-process pipeline: each extension may transform the markdown and produce context.
+  let processedMarkdown = markdown;
+  const preprocessContexts = extensions.map(ext => {
+    /* istanbul ignore else */
+    if (ext.preprocessMarkdown) {
+      const result = ext.preprocessMarkdown(processedMarkdown);
+      processedMarkdown = result.markdown;
+      return result.context;
+    }
+
+    return undefined;
+  });
+
+  const markdownTokens = marked.lexer(processedMarkdown);
+
+  // Post-process pipeline: each extension receives its own context from preprocessing.
+  const finalTokens = extensions.reduce<TokensList>((tokens, ext, index) => {
+    /* istanbul ignore else */
+    if (ext.postprocessTokens) {
+      return ext.postprocessTokens(tokens, preprocessContexts[index]);
+    }
+
+    return tokens;
+  }, markdownTokens);
+
+  return validateTokens(parsedSchema, finalTokens, extensions);
 }

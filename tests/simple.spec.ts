@@ -90,7 +90,7 @@ describe('simple cases', () => {
     expect(validate(schema, markdown)).toHaveLength(0);
   });
 
-  it('should return errors when there are more definitions than tokens', () => {
+  it('should return errors when a required token is missing in non-strict mode', () => {
     const markdown = '# hallo world';
 
     const schema = {
@@ -107,14 +107,51 @@ describe('simple cases', () => {
 
     const errors = validate(schema, markdown);
     expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("Expected a 'paragraph' token");
+  });
+
+  it('should return errors when there are more definitions than tokens in strict mode', () => {
+    const markdown = '# hallo world';
+
+    const schema = {
+      type: 'ghf',
+      strict: true,
+      children: [
+        {
+          type: 'heading',
+        },
+        {
+          type: 'paragraph',
+        },
+      ],
+    };
+
+    const errors = validate(schema, markdown);
+    expect(errors).toHaveLength(1);
     expect(errors[0].message).toContain('Expected 2 token(s) but got 1');
   });
 
-  it('should return errors when there are more tokens than definitions', () => {
+  it('should allow extra tokens when strict mode is disabled', () => {
     const markdown = '# hallo world\n\n hallo world';
 
     const schema = {
       type: 'ghf',
+      children: [
+        {
+          type: 'heading',
+        },
+      ],
+    };
+
+    expect(validate(schema, markdown)).toHaveLength(0);
+  });
+
+  it('should return errors when there are more tokens than definitions in strict mode', () => {
+    const markdown = '# hallo world\n\n hallo world';
+
+    const schema = {
+      type: 'ghf',
+      strict: true,
       children: [
         {
           type: 'heading',

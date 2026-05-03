@@ -15,12 +15,17 @@ function toTokensList(tokens: any[]): TokensList {
 /**
  * Creates a root schema wrapper around provided token definitions.
  * @param children - Schema token definitions under the root.
+ * @param overrides - Optional root-level schema fields used by the test.
  * @returns Root schema definition used by tests.
  */
-function toSchema(children: SchemaTokenDefinition[]): SchemaDefinition {
+function toSchema(
+  children: SchemaTokenDefinition[],
+  overrides: Partial<SchemaDefinition> = {}
+): SchemaDefinition {
   return {
     type: 'root',
     children,
+    ...overrides,
   };
 }
 
@@ -147,7 +152,7 @@ describe('validateTokens', () => {
 
   it('fails when expected space token is missing', () => {
     const errors = validateTokens(
-      toSchema([{ type: 'heading' }, { type: 'space' }, { type: 'paragraph' }]),
+      toSchema([{ type: 'heading' }, { type: 'space' }, { type: 'paragraph' }], { strict: true }),
       toTokensList([
         { type: 'heading', raw: '# h', depth: 1, text: 'h', tokens: [] },
         { type: 'paragraph', raw: 'p', text: 'p', tokens: [] },
@@ -246,7 +251,7 @@ describe('validateTokens', () => {
 
   it('fails when text token expects nested tokens but runtime has none', () => {
     const errors = validateTokens(
-      toSchema([{ type: 'text', tokens: [{ type: 'text' }] }]),
+      toSchema([{ type: 'text', tokens: [{ type: 'text' }] }], { strict: true }),
       toTokensList([{ type: 'text', raw: 'x', text: 'x', escaped: false }])
     );
     expect(errors).toHaveLength(1);
@@ -260,5 +265,75 @@ describe('validateTokens', () => {
     );
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toContain('Heading has depth 1 but expected 2 at line 1, column 1');
+  });
+
+  it('allows extra top-level tokens around the required sequence in non-strict mode', () => {
+    const errors = validateTokens(
+      toSchema([{ type: 'heading' }, { type: 'paragraph' }]),
+      toTokensList([
+        { type: 'hr', raw: '---' },
+        { type: 'heading', raw: '# h', depth: 1, text: 'h', tokens: [] },
+        { type: 'hr', raw: '---' },
+        { type: 'paragraph', raw: 'p', text: 'p', tokens: [] },
+        { type: 'hr', raw: '---' },
+      ])
+    );
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('allows extra nested tokens in non-strict mode', () => {
+    const errors = validateTokens(
+      toSchema([{ type: 'paragraph', tokens: [{ type: 'text' }, { type: 'text' }] }]),
+      toTokensList([
+        {
+          type: 'paragraph',
+          raw: 'line one  \nline two',
+          text: 'line one\nline two',
+          tokens: [
+            { type: 'text', raw: 'line one', text: 'line one', escaped: false },
+            { type: 'br', raw: '  \n' },
+            { type: 'text', raw: 'line two', text: 'line two', escaped: false },
+          ],
+        },
+      ])
+    );
+
+    expect(errors).toHaveLength(0);
+  });
+
+  it('rejects extra top-level tokens when strict mode is enabled', () => {
+    const errors = validateTokens(
+      toSchema([{ type: 'heading' }, { type: 'paragraph' }], { strict: true }),
+      toTokensList([
+        { type: 'heading', raw: '# h', depth: 1, text: 'h', tokens: [] },
+        { type: 'hr', raw: '---' },
+        { type: 'paragraph', raw: 'p', text: 'p', tokens: [] },
+      ])
+    );
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('Expected 2 token(s) but got 3');
+  });
+
+  it('rejects extra nested tokens when strict mode is enabled', () => {
+    const errors = validateTokens(
+      toSchema([{ type: 'paragraph', tokens: [{ type: 'text' }, { type: 'text' }] }], { strict: true }),
+      toTokensList([
+        {
+          type: 'paragraph',
+          raw: 'line one  \nline two',
+          text: 'line one\nline two',
+          tokens: [
+            { type: 'text', raw: 'line one', text: 'line one', escaped: false },
+            { type: 'br', raw: '  \n' },
+            { type: 'text', raw: 'line two', text: 'line two', escaped: false },
+          ],
+        },
+      ])
+    );
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain('Expected 2 token(s) but got 3');
   });
 });

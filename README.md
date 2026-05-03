@@ -25,38 +25,26 @@ See [src/extensions/frontmatter/README.md](src/extensions/frontmatter/README.md)
 
 ## Example: Schema and Markdown
 
-Here is a basic example of a schema definition and a Markdown file that would pass validation:
+Here is a basic example of a schema definition and a Markdown file that would pass validation.
+
+By default the schema runs in non-strict mode, which means the schema tokens must
+appear in order but extra markdown tokens may appear before, after, or between them.
 
 ### Example schema (`schema.json`)
 
 ```json
 {
-  "type": "ghf",
+  "type": "doc",
+  "strict": false,
   "children": [
     {
       "type": "heading",
       "depth": 1
     },
     {
-        "type": "paragraph"
-        },
-        {
-        "type": "hr"
-        },
-        {
-        "type": "list",
-        "ordered": false,
-        "children": [
-            {
-            "type": "listItem",
-            "children": [
-                {
-                "type": "paragraph"
-                }
-            ]
-            }
-        ]
-        }
+      "type": "paragraph"
+    }
+  ]
 }
 ```
 
@@ -65,17 +53,39 @@ Here is a basic example of a schema definition and a Markdown file that would pa
 ```markdown
 # Hello World
 
-This is a sample Markdown file, to be validated against the schema.
-
 ---
 
-this file contains:
-
-- a heading
-- a paragraph
-- a horizontal rule
-- and a list
+This is a sample Markdown file, validated against the schema.
 ```
+
+The extra horizontal rule is allowed because `strict` is `false`.
+
+## Strict mode
+
+Set `strict` to `true` when every token in the markdown must be explicitly
+accounted for by the schema.
+
+```json
+{
+  "type": "doc",
+  "strict": true,
+  "children": [
+    {
+      "type": "heading",
+      "depth": 1
+    },
+    {
+      "type": "paragraph"
+    }
+  ]
+}
+```
+
+With this schema, the markdown example above fails because the `hr` token is not
+listed in `children`.
+
+See `documentation/strict-mode.md` for the full strict versus non-strict rules,
+including nested token examples.
 
 ## CLI Usage
 
@@ -95,10 +105,3 @@ npx markdown-schema validate private-test/schema.json "private-test/Concerts/*.m
 ```
 
 This will validate all Markdown files in the `private-test/Concerts` folder against the schema defined in `private-test/schema.json`.
-
-If the command is unknown or incomplete, the CLI prints a specific hint before the usage line.
-
-```text
-'check' is not a valid command. Available commands: validate.
-Usage: markdown-schema validate <schema.json> <glob>
-```

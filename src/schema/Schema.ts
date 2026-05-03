@@ -11,8 +11,32 @@ type TokenSchemaBase<T extends { type: string }> = {
   type: T['type'];
 } & ScalarSchemaFields<Omit<T, 'type' | 'raw'>>;
 
+/**
+ * Root schema definition for a markdown document.
+ * When `strict` is `true`, every token list must exactly match the schema.
+ * When omitted or `false`, schema tokens must appear in order but extra runtime
+ * tokens may appear before, after, or between them.
+ * @example
+ * {
+ *   type: 'doc',
+ *   children: [
+ *     { type: 'heading', depth: 1 },
+ *     { type: 'paragraph' },
+ *   ],
+ * }
+ * @example
+ * {
+ *   type: 'doc',
+ *   strict: true,
+ *   children: [
+ *     { type: 'heading', depth: 1 },
+ *     { type: 'paragraph' },
+ *   ],
+ * }
+ */
 type SchemaDefinition = {
   type: string;
+  strict?: boolean;
   extensions?: string[];
   children: SchemaTokenDefinition[];
 };
@@ -119,6 +143,15 @@ type SchemaTokenDefinition =
 /**
  * Builds the Zod schema validator for the full document schema, merging in any
  * additional token schemas contributed by extensions.
+ * The returned schema accepts an optional root-level `strict` flag. Runtime
+ * validation defaults this flag to `false` when it is omitted.
+ * @example
+ * const schemaValidator = buildSchemaDefinition();
+ * schemaValidator.parse({
+ *   type: 'doc',
+ *   strict: true,
+ *   children: [{ type: 'heading', depth: 1 }],
+ * });
  * @param extensionTokenSchemas - Extra Zod schemas for token types added by extensions.
  * @returns A Zod object schema that validates a complete schema definition.
  */
@@ -269,6 +302,7 @@ export default function buildSchemaDefinition(
 
   return z.object({
     type: z.string(),
+    strict: z.boolean().optional(),
     extensions: z.array(z.string()).optional(),
     children: z.array(holder.schema),
   }).strict() as z.ZodType<SchemaDefinition>;

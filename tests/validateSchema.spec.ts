@@ -2,6 +2,32 @@ import { describe, expect, it } from 'vitest';
 import validateSchema from '../src/validateSchema';
 
 describe('validateSchema invalid_type error messages', () => {
+  describe('strict field', () => {
+    it('accepts strict when it is true', () => {
+      const parsed = validateSchema({ type: 'doc', strict: true, children: [] });
+
+      expect(parsed).toEqual({ type: 'doc', strict: true, children: [] });
+    });
+
+    it('accepts strict when it is false', () => {
+      const parsed = validateSchema({ type: 'doc', strict: false, children: [] });
+
+      expect(parsed).toEqual({ type: 'doc', strict: false, children: [] });
+    });
+
+    it('leaves strict undefined when omitted', () => {
+      const parsed = validateSchema({ type: 'doc', children: [] });
+
+      expect(parsed).toEqual({ type: 'doc', children: [] });
+    });
+
+    it('returns a strict-specific message when strict is not a boolean', () => {
+      expect(() => {
+        validateSchema({ type: 'doc', strict: 'yes', children: [] });
+      }).toThrow('Invalid strict: expected boolean, got string');
+    });
+  });
+
   describe('children field', () => {
     it('returns a children-specific message when children is a string', () => {
       expect(() => {

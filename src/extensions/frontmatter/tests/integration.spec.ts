@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import validate from '../../../index';
 
 describe('frontmatter extension integration', () => {
-  it('fails when markdown contains frontmatter the schema does not expect', () => {
+  it('allows unexpected frontmatter in non-strict mode when later tokens still match', () => {
     const markdown = `---
 title: hallo world
 ---
@@ -11,6 +11,27 @@ title: hallo world
 
     const schema = {
       type: 'ghf',
+      extensions: ['frontmatter'],
+      children: [
+        {
+          type: 'heading',
+        },
+      ],
+    };
+
+    expect(validate(schema, markdown)).toHaveLength(0);
+  });
+
+  it('fails when markdown contains frontmatter the schema does not expect in strict mode', () => {
+    const markdown = `---
+title: hallo world
+---
+# hallo world
+`;
+
+    const schema = {
+      type: 'ghf',
+      strict: true,
       extensions: ['frontmatter'],
       children: [
         {
@@ -29,6 +50,28 @@ title: hallo world
 
     const schema = {
       type: 'ghf',
+      extensions: ['frontmatter'],
+      children: [
+        {
+          type: 'frontmatter',
+        },
+        {
+          type: 'heading',
+        },
+      ],
+    };
+
+    const errors = validate(schema, markdown);
+    expect(errors).toHaveLength(1);
+    expect(errors[0].message).toContain("Expected a 'frontmatter' token");
+  });
+
+  it('fails when the schema expects frontmatter but the markdown does not have it in strict mode', () => {
+    const markdown = '# hallo world';
+
+    const schema = {
+      type: 'ghf',
+      strict: true,
       extensions: ['frontmatter'],
       children: [
         {

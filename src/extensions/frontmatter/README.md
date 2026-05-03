@@ -28,3 +28,32 @@ Rules:
 - `pattern` is a regular expression checked as a full-string match.
 - Unknown frontmatter keys are allowed.
 - `text` and `keys` cannot be used together on the same `frontmatter` token.
+
+## Strict mode interaction
+
+`strict` is configured on the root schema, not on the `frontmatter` token itself.
+
+- With `strict` omitted or set to `false`, extra tokens can appear before or after
+  the declared `frontmatter` token as long as the schema tokens still appear in order.
+- With `strict: true`, the frontmatter token must be explicitly listed anywhere it
+  appears in the markdown token stream.
+
+```json
+{
+  "type": "doc",
+  "strict": true,
+  "extensions": ["frontmatter"],
+  "children": [
+    {
+      "type": "frontmatter"
+    },
+    {
+      "type": "heading",
+      "depth": 1
+    }
+  ]
+}
+```
+
+With `strict: false`, a schema that only declares the `heading` token still accepts
+the same markdown because the frontmatter token is treated as an extra token.

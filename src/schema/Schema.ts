@@ -17,12 +17,6 @@ type SchemaDefinition = {
   children: SchemaTokenDefinition[];
 };
 
-type FrontmatterToken = {
-  type: 'frontmatter';
-  raw: string;
-  text: string;
-};
-
 type SchemaTableCellDefinition = ScalarSchemaFields<Tokens.TableCell> & {
   tokens?: SchemaTokenDefinition[];
 };
@@ -94,7 +88,9 @@ type SchemaTextDefinition = TokenSchemaBase<Tokens.Text> & {
   tokens?: SchemaTokenDefinition[];
 };
 
-type SchemaFrontmatterDefinition = TokenSchemaBase<FrontmatterToken>;
+type SchemaExtensionTokenDefinition = {
+  type: string;
+} & Record<string, unknown>;
 
 type SchemaTokenDefinition =
   | SchemaBlockquoteDefinition
@@ -118,7 +114,7 @@ type SchemaTokenDefinition =
   | SchemaStrongDefinition
   | SchemaTableDefinition
   | SchemaTextDefinition
-  | SchemaFrontmatterDefinition;
+  | SchemaExtensionTokenDefinition;
 
 /**
  * Builds the Zod schema validator for the full document schema, merging in any
@@ -126,11 +122,18 @@ type SchemaTokenDefinition =
  * @param extensionTokenSchemas - Extra Zod schemas for token types added by extensions.
  * @returns A Zod object schema that validates a complete schema definition.
  */
-export default function buildSchemaDefinition(extensionTokenSchemas: z.ZodType[] = []): z.ZodType<SchemaDefinition> {
+export default function buildSchemaDefinition(
+  extensionTokenSchemas: z.ZodType[] = []
+): z.ZodType<SchemaDefinition> {
   // A holder object is used instead of `let` so that z.lazy closures capturing
   // the getter do not trigger the prefer-const lint rule.
-  const holder: { schema: z.ZodType<SchemaTokenDefinition> } = {} as { schema: z.ZodType<SchemaTokenDefinition> };
-  const lazy = () => holder.schema;
+  const holder: { schema: z.ZodType<SchemaTokenDefinition> } =
+    {} as { schema: z.ZodType<SchemaTokenDefinition> };
+  /**
+   * Returns the current shared schema for lazy references.
+   * @returns The current SchemaTokenDefinition schema.
+   */
+  function lazy() { return holder.schema; }
 
   const tableCellDefinitionSchema: z.ZodType<SchemaTableCellDefinition> = z.object({
     text: z.string().optional(),
@@ -271,4 +274,9 @@ export default function buildSchemaDefinition(extensionTokenSchemas: z.ZodType[]
   }).strict() as z.ZodType<SchemaDefinition>;
 }
 
-export type { FrontmatterToken, SchemaDefinition, SchemaTableCellDefinition, SchemaTokenDefinition };
+export type {
+  SchemaDefinition,
+  SchemaExtensionTokenDefinition,
+  SchemaTableCellDefinition,
+  SchemaTokenDefinition,
+};

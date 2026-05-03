@@ -1,4 +1,4 @@
-import type { Extension } from './types';
+import type { Extension } from '../Extension';
 import frontmatterExtension from './frontmatter';
 
 export type { Extension };

@@ -60,29 +60,6 @@ describe('marked ast integration', () => {
     expect(validate(schema, markdown)).toHaveLength(0);
   });
 
-  it('supports full frontmatter and mixed token validation with vague constraints', () => {
-    const markdown = '---\ntitle: demo\n---\n## H\n\nline one  \nline two';
-
-    const schema = {
-      type: 'root',
-      extensions: ['frontmatter'],
-      children: [
-        { type: 'frontmatter' },
-        { type: 'heading', depth: 2, tokens: [{ type: 'text' }] },
-        {
-          type: 'paragraph',
-          tokens: [
-            { type: 'text' },
-            { type: 'br' },
-            { type: 'text' },
-          ],
-        },
-      ],
-    };
-
-    expect(validate(schema, markdown)).toHaveLength(0);
-  });
-
   it('validates blockquote token with nested paragraph', () => {
     const markdown = '> quoted text';
 

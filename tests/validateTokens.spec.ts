@@ -2,7 +2,6 @@ import type { TokensList } from 'marked';
 import { describe, expect, it } from 'vitest';
 import type { SchemaDefinition, SchemaTokenDefinition } from '../src/schema/Schema';
 import validateTokens from '../src/validateTokens';
-import frontmatterExtension from '../src/extensions/frontmatter';
 
 /**
  * Converts plain token arrays into a `TokensList` with a links map.
@@ -128,16 +127,6 @@ describe('validateTokens', () => {
       expect(result).toHaveLength(0);
     }
   });
-
-  it('validates frontmatter tokens via the frontmatter extension', () => {
-    const result = validateTokens(
-      toSchema([{ type: 'frontmatter', text: 'title: x' }]),
-      toTokensList([{ type: 'frontmatter', raw: '---\ntitle: x\n---\n', text: 'title: x' }]),
-      [frontmatterExtension]
-    );
-    expect(result).toHaveLength(0);
-  });
-
   it('fails when top-level type does not match', () => {
     const errors = validateTokens(
       toSchema([{ type: 'paragraph' }]),
@@ -271,15 +260,5 @@ describe('validateTokens', () => {
     );
     expect(errors).toHaveLength(1);
     expect(errors[0].message).toContain('Heading has depth 1 but expected 2 at line 1, column 1');
-  });
-
-  it('throws when an extension validator explicitly rejects a token', () => {
-    const errors = validateTokens(
-      toSchema([{ type: 'frontmatter', text: 'expected-text' }]),
-      toTokensList([{ type: 'frontmatter', raw: '---\nactual\n---\n', text: 'actual-text' }]),
-      [frontmatterExtension]
-    );
-    expect(errors).toHaveLength(1);
-    expect(errors[0].message).toContain("Extension validator rejected 'frontmatter' token");
   });
 });

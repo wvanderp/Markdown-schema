@@ -14,3 +14,91 @@ This schema can then be used to validate your Markdown files, ensuring that they
 ```bash
 npm install markdown-schema
 ```
+
+## Extensions
+
+Built-in extensions are registered in `src/extensions` and loaded only when a schema lists them in `extensions`.
+
+### Frontmatter
+
+See [src/extensions/frontmatter/README.md](src/extensions/frontmatter/README.md) for the frontmatter extension schema and rules.
+
+## Example: Schema and Markdown
+
+Here is a basic example of a schema definition and a Markdown file that would pass validation:
+
+### Example schema (`schema.json`)
+
+```json
+{
+  "type": "ghf",
+  "children": [
+    {
+      "type": "heading",
+      "depth": 1
+    },
+    {
+        "type": "paragraph"
+        },
+        {
+        "type": "hr"
+        },
+        {
+        "type": "list",
+        "ordered": false,
+        "children": [
+            {
+            "type": "listItem",
+            "children": [
+                {
+                "type": "paragraph"
+                }
+            ]
+            }
+        ]
+        }
+}
+```
+
+### Example Markdown (`example.md`)
+
+```markdown
+# Hello World
+
+This is a sample Markdown file, to be validated against the schema.
+
+---
+
+this file contains:
+
+- a heading
+- a paragraph
+- a horizontal rule
+- and a list
+```
+
+## CLI Usage
+
+You can use the CLI tool to validate Markdown files against a schema. The basic usage is:
+
+```bash
+npx markdown-schema validate <schema.json> <glob>
+```
+
+- `<schema.json>`: Path to your schema definition file.
+- `<glob>`: Glob pattern matching the Markdown files to validate (e.g., `private-test/Concerts/*.md`).
+
+### Example command
+
+```bash
+npx markdown-schema validate private-test/schema.json "private-test/Concerts/*.md"
+```
+
+This will validate all Markdown files in the `private-test/Concerts` folder against the schema defined in `private-test/schema.json`.
+
+If the command is unknown or incomplete, the CLI prints a specific hint before the usage line.
+
+```text
+'check' is not a valid command. Available commands: validate.
+Usage: markdown-schema validate <schema.json> <glob>
+```

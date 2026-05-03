@@ -1,9 +1,9 @@
 import { marked, type TokensList } from 'marked';
+import type { Extension } from './Extension';
 import validateSchema from './validateSchema';
 import validateTokens from './validateTokens';
 import validateMarkdown from './validateMarkdown';
 import { resolveExtensions } from './extensions/index';
-import type { Extension } from './extensions/types';
 import type { ValidationError } from './validateTokens';
 
 export type { Extension, ValidationError };

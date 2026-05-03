@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { glob } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { resolve, relative } from 'node:path';
+import { parseCliArguments } from './cliArguments';
 import validate from './index';
 
 const { positionals } = parseArgs({
@@ -10,14 +11,14 @@ const { positionals } = parseArgs({
   options: {},
 });
 
-const [command, schemaPath, pattern] = positionals;
+const parsedArguments = parseCliArguments(positionals);
 
-if (command !== 'validate' || !schemaPath || !pattern) {
-  process.stderr.write(
-    'Usage: markdown-schema validate <schema.json> <glob>\n'
-  );
+if (!parsedArguments.ok) {
+  process.stderr.write(`${parsedArguments.message}\n`);
   process.exit(1);
 }
+
+const { schemaPath, pattern } = parsedArguments;
 
 const schemaAbsolute = resolve(process.cwd(), schemaPath);
 

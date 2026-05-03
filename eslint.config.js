@@ -7,6 +7,7 @@ export default [
   jsdoc.configs['flat/recommended-typescript'],
   {
     rules: {
+      'func-style': ['error', 'declaration', { allowArrowFunctions: false }],
       'jsdoc/require-jsdoc': [
         'error',
         {
@@ -18,8 +19,8 @@ export default [
         },
       ],
       'jsdoc/require-description': 'error',
-      // Enforce no space before function paren
       '@stylistic/space-before-function-paren': ['error', 'never'],
+      'max-len': ['error', { code: 100, ignoreComments: true, ignoreStrings: true, ignoreTemplateLiterals: true }],
     },
   },
 ];

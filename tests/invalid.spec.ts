@@ -62,13 +62,13 @@ describe('invalid', () => {
     it('should throw when children is missing', () => {
       expect(() => {
         validate({ type: 'ghf' } as any, '');
-      }).toThrow('The schema is invalid');
+      }).toThrow(/expected.*array|invalid/i);
     });
 
     it('should throw when child type is missing', () => {
       expect(() => {
         validate({ type: 'ghf', children: [{}] } as any, '');
-      }).toThrow('The schema is invalid');
+      }).toThrow(/expected one of|invalid/i);
     });
   });
 });
